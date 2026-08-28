@@ -91,6 +91,9 @@ body{
 .gate-err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;opacity:0;transition:.2s}
 .gate-err.show{opacity:1}
 .gate-hint{margin-top:22px;font-size:12px;color:var(--text-faint)}
+.nick-title{font-size:18px;margin-bottom:6px}
+.nick-sub{margin-bottom:22px}
+.nick-input{letter-spacing:normal}
 
 /* ===== 主界面 ===== */
 #app{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;max-width:760px;margin:0 auto}
@@ -109,6 +112,7 @@ header{
 .head-txt{flex:1;min-width:0}
 .head-txt h1{font-size:16px;font-weight:700;letter-spacing:.3px}
 .head-txt p{font-size:11px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head-nick{font-size:12px;font-weight:500;color:var(--accent);margin-left:6px;cursor:pointer;border-bottom:1px dashed rgba(62,230,255,.4)}
 .head-clear{
   flex-shrink:0;padding:7px 12px;border-radius:10px;border:1px solid var(--stroke);
   background:rgba(255,255,255,.04);color:var(--text-dim);font-size:12px;cursor:pointer;transition:.2s;
@@ -233,12 +237,23 @@ footer{
     </div>
     <div class="gate-title">思维教练</div>
     <div class="gate-sub">现代思维工具 <b>100</b> 讲 · 万维钢<br>把纠结变成判断，把判断变成行动</div>
-    <div class="gate-input-wrap">
-      <input class="gate-input" id="passcode" type="password" inputmode="numeric" placeholder="请输入访问口令" maxlength="12" autocomplete="off">
+    <div id="passWrap">
+      <div class="gate-input-wrap">
+        <input class="gate-input" id="passcode" type="password" inputmode="numeric" placeholder="请输入访问口令" maxlength="12" autocomplete="off">
+      </div>
+      <button class="gate-btn" id="gateBtn">进入</button>
+      <div class="gate-err" id="gateErr">口令不对，再试一次</div>
+      <div class="gate-hint">口令请向分享者索取</div>
     </div>
-    <button class="gate-btn" id="gateBtn">进入</button>
-    <div class="gate-err" id="gateErr">口令不对，再试一次</div>
-    <div class="gate-hint">口令请向分享者索取</div>
+    <div id="nickWrap" style="display:none">
+      <div class="gate-title nick-title">给自己起个昵称</div>
+      <div class="gate-sub nick-sub">对话历史按昵称分开保存<br>换手机输同一个昵称就能找回</div>
+      <div class="gate-input-wrap">
+        <input class="gate-input nick-input" id="nickname" type="text" placeholder="例如：老王、小张" maxlength="20" autocomplete="off">
+      </div>
+      <button class="gate-btn" id="nickBtn">开始使用</button>
+      <div class="gate-err" id="nickErr">昵称不能为空</div>
+    </div>
   </div>
 </div>
 
@@ -252,7 +267,7 @@ footer{
       </svg>
     </div>
     <div class="head-txt">
-      <h1>思维教练</h1>
+      <h1>思维教练<span class="head-nick" id="headNick"></span></h1>
       <p>现代思维工具100讲 · 万维钢</p>
     </div>
     <button class="head-clear" id="clearBtn">新对话</button>
@@ -620,15 +635,71 @@ function renderShareImage(userText, aiMd){
   const $ = s => document.querySelector(s);
   const chat = $('#chat'), input = $('#input'), send = $('#send');
   const gate = $('#gate'), passcode = $('#passcode'), gateBtn = $('#gateBtn'), gateErr = $('#gateErr');
+  const passWrap = $('#passWrap'), nickWrap = $('#nickWrap'), nicknameInput = $('#nickname'), nickBtn = $('#nickBtn'), nickErr = $('#nickErr');
+  const headNick = $('#headNick');
 
   let history = [];   // [{role, content}]
+  let nickname = localStorage.getItem('tc_nickname') || '';
   let unlocked = localStorage.getItem('tc_unlocked') === '1';
   let busy = false;
+  let syncing = false;
 
-  // ===== 口令 =====
-  function showApp(){
+  // ===== 云端历史（GitHub 仓库，按昵称隔离）=====
+  async function loadCloudHistory(nick){
+    const r = await fetch('/api/history?nickname=' + encodeURIComponent(nick));
+    if(!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j.history) ? j.history : [];
+  }
+  async function saveCloudHistory(nick, hist){
+    await fetch('/api/history', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ nickname: nick, history: hist })
+    });
+  }
+  function debouncedSave(){
+    if(syncing) return;
+    syncing = true;
+    setTimeout(async ()=>{
+      try { await saveCloudHistory(nickname, history); } catch(e){ console.error('保存历史失败', e); }
+      syncing = false;
+    }, 600);
+  }
+
+  // ===== 口令 + 昵称 =====
+  function restoreHistory(){
+    let lastUser = null;
+    history.forEach(msg => {
+      if(msg.role === 'user'){
+        lastUser = msg.content;
+        const m = document.createElement('div'); m.className='msg user';
+        m.innerHTML = '<div class="bubble"></div>';
+        m.querySelector('.bubble').textContent = msg.content;
+        chat.appendChild(m);
+      } else if(msg.role === 'assistant'){
+        const m = document.createElement('div'); m.className='msg ai';
+        m.innerHTML = '<div class="avatar">✦</div><div class="bubble"></div>';
+        renderMd(m.querySelector('.bubble'), msg.content, lastUser);
+        chat.appendChild(m);
+      }
+    });
+    scrollBottom();
+  }
+  async function enterApp(){
+    let loaded = [];
+    try { loaded = await loadCloudHistory(nickname); } catch(e){ loaded = []; }
+    history = loaded.filter(m => m && m.content && (m.role==='user'||m.role==='assistant'));
+    headNick.textContent = nickname ? ('· ' + nickname) : '';
     gate.classList.add('hide');
-    if(!history.length){ addAiMsg(WELCOME, false); }
+    chat.innerHTML = '';
+    if(history.length){ restoreHistory(); }
+    else { addAiMsg(WELCOME, false); }
+  }
+  function showNickInput(){
+    passWrap.style.display = 'none';
+    nickWrap.style.display = 'block';
+    nicknameInput.focus();
   }
   function tryUnlock(){
     const code = passcode.value.trim();
@@ -641,7 +712,8 @@ function renderShareImage(userText, aiMd){
       if(r.status === 400){ // 口令正确（仅问题为空）
         localStorage.setItem('tc_unlocked','1');
         localStorage.setItem('tc_pass', code);
-        showApp();
+        if(nickname){ enterApp(); }
+        else { showNickInput(); }
       } else {
         gateErr.classList.add('show');
       }
@@ -649,7 +721,32 @@ function renderShareImage(userText, aiMd){
   }
   gateBtn.addEventListener('click', tryUnlock);
   passcode.addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
-  if(unlocked){ showApp(); }
+  nickBtn.addEventListener('click', async ()=>{
+    const nick = nicknameInput.value.trim();
+    if(!nick){ nickErr.classList.add('show'); return; }
+    nickname = nick;
+    localStorage.setItem('tc_nickname', nick);
+    nickBtn.disabled = true;
+    nickBtn.textContent = '加载中…';
+    await enterApp();
+    nickBtn.disabled = false;
+    nickBtn.textContent = '开始使用';
+  });
+  nicknameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') nickBtn.click(); });
+  headNick.addEventListener('click', ()=>{
+    if(!nickname) return;
+    if(!confirm('切换昵称？当前「' + nickname + '」的历史已存云端，换回同名即可找回。')) return;
+    localStorage.removeItem('tc_nickname');
+    nickname = '';
+    chat.innerHTML = '';
+    headNick.textContent = '';
+    gate.classList.remove('hide');
+    showNickInput();
+  });
+  if(unlocked){
+    if(nickname){ enterApp(); }
+    else { showNickInput(); }
+  }
 
   // ===== 消息渲染 =====
   function scrollBottom(){ chat.scrollTop = chat.scrollHeight; }
@@ -660,6 +757,7 @@ function renderShareImage(userText, aiMd){
     m.querySelector('.bubble').textContent = text;
     chat.appendChild(m); scrollBottom();
     history.push({role:'user', content:text});
+    debouncedSave();
   }
 
   function addAiMsg(md, animate){
@@ -694,7 +792,20 @@ function renderShareImage(userText, aiMd){
     try {
       const canvas = renderShareImage(userText, aiMd);
       const img = document.getElementById('shareImg');
-      img.src = canvas.toDataURL('image/png');
+      // 用 blob URL 替代 data URL：微信对超大 data URL 长按保存常失效，blob URL 更可靠
+      if (img._objectUrl) { URL.revokeObjectURL(img._objectUrl); img._objectUrl = null; }
+      if (canvas.toBlob) {
+        canvas.toBlob(function(blob){
+          if (blob) {
+            img._objectUrl = URL.createObjectURL(blob);
+            img.src = img._objectUrl;
+          } else {
+            img.src = canvas.toDataURL('image/png');
+          }
+        }, 'image/png');
+      } else {
+        img.src = canvas.toDataURL('image/png');
+      }
       document.getElementById('shareModal').classList.add('show');
     } catch(e) {
       console.error('生成分享图失败', e);
@@ -724,6 +835,7 @@ function renderShareImage(userText, aiMd){
         try{ const j = await r.json(); msg = j.error || msg; }catch(e){}
         renderMd(bubble, '⚠️ **' + msg + '**');
         history.push({role:'assistant', content: msg});
+        debouncedSave();
         return;
       }
       // 流式读取
@@ -740,8 +852,7 @@ function renderShareImage(userText, aiMd){
       }
       renderMd(bubble, acc, q);
       history.push({role:'assistant', content: acc});
-      // 精简历史：只保留最近 8 条
-      if(history.length > 8){ history = history.slice(-8); }
+      debouncedSave();
     }).catch(e=>{
       renderMd(bubble, '⚠️ 网络错误，请重试');
     }).finally(()=>{
@@ -764,6 +875,7 @@ function renderShareImage(userText, aiMd){
     if(busy) return;
     history = [];
     chat.innerHTML='';
+    saveCloudHistory(nickname, []).catch(()=>{});
     addAiMsg(WELCOME, false);
   });
 
@@ -771,7 +883,15 @@ function renderShareImage(userText, aiMd){
   const shareModal = document.getElementById('shareModal');
   $('#shareClose').addEventListener('click', ()=>{ shareModal.classList.remove('show'); });
   shareModal.addEventListener('click', (e)=>{ if(e.target === shareModal) shareModal.classList.remove('show'); });
+  function isWeChat(){ return /MicroMessenger/i.test(navigator.userAgent); }
   $('#shareDl').addEventListener('click', ()=>{
+    if(isWeChat()){
+      // 微信内置浏览器屏蔽 a[download]，改为引导长按保存
+      const tip = document.querySelector('.share-tip');
+      tip.textContent = '请长按上方图片 → 弹出菜单点「保存图片」';
+      tip.style.color = '#3ee6ff';
+      return;
+    }
     const img = document.getElementById('shareImg');
     const a = document.createElement('a');
     a.href = img.src;
