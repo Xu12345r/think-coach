@@ -3,6 +3,9 @@
     "api/ask.js": {
       "includeFiles": "api/system-prompt.md",
       "maxDuration": 60
+    },
+    "api/history.js": {
+      "maxDuration": 30
     }
   }
 }
