@@ -24,13 +24,12 @@ function fileUrl(nickname) {
 
 async function readHistory(nickname) {
   const res = await fetch(fileUrl(nickname), { headers: ghHeaders() });
-  if (res.status === 404) return [];
+  if (res.status === 404) return null;
   if (!res.ok) throw new Error(`读历史失败(${res.status})`);
   const data = await res.json();
   try {
-    const arr = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
+    return JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
+  } catch { return null; }
 }
 
 async function writeHistory(nickname, history) {
