@@ -1,0 +1,9 @@
+{
+  "name": "think-coach",
+  "version": "1.0.0",
+  "private": true,
+  "description": "万维钢·现代思维工具100讲 - 思维教练",
+  "engines": {
+    "node": ">=18"
+  }
+}

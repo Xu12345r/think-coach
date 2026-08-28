@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/ask.js": {
+      "includeFiles": "api/system-prompt.md",
+      "maxDuration": 60
+    }
+  }
+}
