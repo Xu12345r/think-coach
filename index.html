@@ -203,12 +203,12 @@ footer{
 
 /* ===== 分享弹窗 ===== */
 #shareModal{
-  position:fixed;inset:0;z-index:100;display:none;align-items:flex-start;justify-content:center;
+  position:fixed;inset:0;z-index:100;display:none;
   background:rgba(0,0,0,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  overflow-y:auto;padding:24px 16px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;padding:24px 16px;
 }
-#shareModal.show{display:flex}
-.share-box{width:min(94vw,420px);animation:rise .3s cubic-bezier(.2,.7,.2,1)}
+#shareModal.show{display:block}
+.share-box{width:min(94vw,420px);margin:0 auto;animation:rise .3s cubic-bezier(.2,.7,.2,1)}
 .share-box img{width:100%;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.6);display:block}
 .share-tip{text-align:center;color:#c9ccdd;font-size:13px;margin-top:14px;letter-spacing:.3px}
 .share-actions{display:flex;gap:10px;margin-top:14px}
