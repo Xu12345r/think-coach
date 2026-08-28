@@ -2,7 +2,7 @@
 // GET  /api/history?nickname=xxx   → 读该昵称的历史
 // POST /api/history  {nickname, history} → 存历史
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const REPO = 'Xu12345r/think-coach';
+const REPO = 'Xu12345r/think-coach-data';
 const BRANCH = 'main';
 
 function sendJson(res, status, obj) {
