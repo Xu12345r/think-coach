@@ -792,20 +792,8 @@ function renderShareImage(userText, aiMd){
     try {
       const canvas = renderShareImage(userText, aiMd);
       const img = document.getElementById('shareImg');
-      // 用 blob URL 替代 data URL：微信对超大 data URL 长按保存常失效，blob URL 更可靠
-      if (img._objectUrl) { URL.revokeObjectURL(img._objectUrl); img._objectUrl = null; }
-      if (canvas.toBlob) {
-        canvas.toBlob(function(blob){
-          if (blob) {
-            img._objectUrl = URL.createObjectURL(blob);
-            img.src = img._objectUrl;
-          } else {
-            img.src = canvas.toDataURL('image/png');
-          }
-        }, 'image/png');
-      } else {
-        img.src = canvas.toDataURL('image/png');
-      }
+      // 用 data URL（完整 base64）而非 blob URL：微信长按保存 blob URL 会截断成半截
+      img.src = canvas.toDataURL('image/png');
       document.getElementById('shareModal').classList.add('show');
     } catch(e) {
       console.error('生成分享图失败', e);
