@@ -92,7 +92,7 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 200, { history });
     }
     if (req.method === 'POST') {
-      const history = Array.isArray(body.history) ? body.history : [];
+      const history = (body.history === undefined || body.history === null) ? null : body.history;
       await writeHistory(nickname, history);
       return sendJson(res, 200, { ok: true });
     }
