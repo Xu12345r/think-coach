@@ -133,7 +133,9 @@ header{
   color:#fff;padding:12px 16px;border-radius:18px 18px 4px 18px;
   font-size:15px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
   box-shadow:0 6px 20px rgba(124,108,255,.28);
+  cursor:pointer;
 }
+.msg.user .bubble:active{transform:scale(.98)}
 .msg.ai .bubble{
   background:var(--card);border:1px solid var(--stroke);border-radius:4px 18px 18px 18px;
   padding:16px 18px;font-size:14.5px;line-height:1.75;color:#d6d9ec;
@@ -207,14 +209,34 @@ footer{
 #shareModal.show{display:block}
 .share-box{width:min(94vw,420px);margin:0 auto;animation:rise .3s cubic-bezier(.2,.7,.2,1)}
 .share-box img{width:100%;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.6);display:block}
-.share-tip{text-align:center;color:#c9ccdd;font-size:13px;margin-top:14px;letter-spacing:.3px}
-.share-actions{display:flex;gap:10px;margin-top:14px}
-.share-actions button{
-  flex:1;padding:13px;border-radius:13px;border:none;cursor:pointer;font-size:15px;font-weight:600;color:#fff;
+.share-img-wrap{position:relative}
+.share-x{
+  position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;
+  border:none;background:rgba(255,255,255,.18);color:#fff;font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
 }
-.share-close{background:rgba(255,255,255,.12)}
-.share-dl{background:linear-gradient(135deg,var(--primary),var(--primary2));box-shadow:0 6px 18px rgba(124,108,255,.35)}
-.share-actions button:active{transform:scale(.97)}
+.share-x:active{transform:scale(.92)}
+.share-tip{text-align:center;color:#c9ccdd;font-size:13px;margin-top:14px;letter-spacing:.3px}
+
+/* ===== 消息下方操作按钮组 ===== */
+.msg-actions{display:flex;gap:8px;margin-top:12px}
+.msg-actions .act-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 12px;border-radius:9px;border:1px solid var(--stroke);
+  background:rgba(255,255,255,.05);color:var(--text-dim);font-size:12px;cursor:pointer;
+  transition:.2s;
+}
+.msg-actions .act-btn:active{background:rgba(255,255,255,.12)}
+.msg-actions .act-btn svg{width:14px;height:14px}
+
+/* ===== toast ===== */
+#toast{
+  position:fixed;left:50%;bottom:110px;transform:translateX(-50%);
+  padding:10px 20px;border-radius:20px;background:rgba(10,14,34,.92);color:#fff;font-size:14px;
+  z-index:300;opacity:0;pointer-events:none;transition:.3s;white-space:nowrap;
+  box-shadow:0 8px 30px rgba(0,0,0,.5);
+}
+#toast.show{opacity:1}
 
 /* ===== 历史会话弹窗 ===== */
 #sessionModal{
@@ -402,14 +424,16 @@ footer{
 <!-- 分享长图弹窗 -->
 <div id="shareModal">
   <div class="share-box">
-    <img id="shareImg" alt="思维教练分享图">
-    <div class="share-tip">长按图片即可保存到相册</div>
-    <div class="share-actions">
-      <button class="share-close" id="shareClose">关闭</button>
-      <button class="share-dl" id="shareDl">保存图片</button>
+    <div class="share-img-wrap">
+      <img id="shareImg" alt="思维教练分享图">
+      <button class="share-x" id="shareClose" aria-label="关闭">✕</button>
     </div>
+    <div class="share-tip">长按图片即可保存到相册</div>
   </div>
 </div>
+
+<!-- toast -->
+<div id="toast"></div>
 
 <!-- 历史会话弹窗 -->
 <div id="sessionModal">
@@ -448,6 +472,19 @@ function md2html(md){
   }
   closeLists();
   return html;
+}
+
+/* markdown 转纯文本（用于复制） */
+function md2text(md){
+  if(!md) return '';
+  return String(md)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')          // 去加粗
+    .replace(/^#{1,3}\s+/gm, '')                 // 去标题标记
+    .replace(/^\s*[-*]\s+/gm, '• ')              // 无序列表转圆点
+    .replace(/^\s*\d+[.)]\s+/gm, '')             // 去有序列表序号
+    .replace(/`([^`]+)`/g, '$1')                 // 去行内代码
+    .replace(/[*_]/g, '')                        // 去斜体等残留标记
+    .trim();
 }
 
 /* ===== 长图生成（markdown 解析 + canvas 绘制，无外部依赖） ===== */
@@ -812,16 +849,19 @@ function renderShareImage(userText, aiMd){
   // ===== 口令 + 昵称 =====
   function restoreHistory(){
     let lastUser = null;
-    history.forEach(msg => {
+    history.forEach((msg, i) => {
       if(msg.role === 'user'){
         lastUser = msg.content;
         const m = document.createElement('div'); m.className='msg user';
         m.innerHTML = '<div class="bubble"></div>';
         m.querySelector('.bubble').textContent = msg.content;
+        m.querySelector('.bubble').addEventListener('click', ()=> editUserMsg(msg.content));
+        m.dataset.i = i;
         chat.appendChild(m);
       } else if(msg.role === 'assistant'){
         const m = document.createElement('div'); m.className='msg ai';
         m.innerHTML = '<div class="avatar">✦</div><div class="bubble"></div>';
+        m.dataset.i = i;
         renderMd(m.querySelector('.bubble'), msg.content, lastUser);
         chat.appendChild(m);
       }
@@ -895,8 +935,10 @@ function renderShareImage(userText, aiMd){
     const m = document.createElement('div'); m.className='msg user';
     m.innerHTML = '<div class="bubble"></div>';
     m.querySelector('.bubble').textContent = text;
+    m.querySelector('.bubble').addEventListener('click', ()=> editUserMsg(text));
     chat.appendChild(m); scrollBottom();
     history.push({role:'user', content:text});
+    m.dataset.i = history.length - 1;
     debouncedSave();
   }
 
@@ -918,11 +960,24 @@ function renderShareImage(userText, aiMd){
     el.classList.remove('streaming');
     el.innerHTML = '<div class="ai-md">' + (md2html(md) || '') + '</div>';
     if(userQuestion && md){
-      const btn = document.createElement('button');
-      btn.className = 'share-btn';
-      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>生成分享图';
-      btn.onclick = function(){ showShare(userQuestion, md); };
-      el.appendChild(btn);
+      const bar = document.createElement('div');
+      bar.className = 'msg-actions';
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'act-btn';
+      copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制';
+      copyBtn.onclick = function(){ copyText(md2text(md)); };
+      bar.appendChild(copyBtn);
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'act-btn';
+      shareBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>分享';
+      shareBtn.onclick = function(){ showShare(userQuestion, md); };
+      bar.appendChild(shareBtn);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'act-btn';
+      delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除';
+      delBtn.onclick = function(){ deleteRound(el); };
+      bar.appendChild(delBtn);
+      el.appendChild(bar);
     }
     scrollBottom();
   }
@@ -938,6 +993,59 @@ function renderShareImage(userText, aiMd){
     } catch(e) {
       console.error('生成分享图失败', e);
     }
+  }
+
+  // ===== 复制 =====
+  let toastTimer = null;
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.classList.remove('show'), 1800);
+  }
+  function fallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.top = '-9999px'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    toast(ok ? '已复制到剪贴板' : '复制失败，请长按选择复制');
+  }
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=> toast('已复制到剪贴板')).catch(()=> fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  // ===== 删除这轮问答 =====
+  function deleteRound(bubble){
+    const aiEl = bubble.parentElement;  // .msg.ai
+    const aiIdx = parseInt(aiEl.dataset.i || '-1', 10);
+    if(aiIdx < 0 || aiIdx >= history.length) return;
+    if(!confirm('删除这条回答（连同你的问题）？')) return;
+    const delIdxs = [aiIdx];
+    if(aiIdx > 0 && history[aiIdx-1] && history[aiIdx-1].role === 'user') delIdxs.push(aiIdx-1);
+    delIdxs.sort((a,b)=>b-a).forEach(i=> history.splice(i,1));
+    chat.innerHTML = '';
+    if(history.length){ restoreHistory(); }
+    else { addAiMsg(WELCOME, false); }
+    debouncedSave();
+    toast('已删除');
+  }
+
+  // ===== 点击自己的问题 → 回填重新编辑 =====
+  function editUserMsg(text){
+    input.value = text;
+    input.focus();
+    autoGrow();
+    scrollBottom();
+    toast('已回填，修改后点发送即可重新提问');
   }
 
   // ===== 发送 =====
@@ -982,6 +1090,7 @@ function renderShareImage(userText, aiMd){
       }
       renderMd(bubble, acc, q);
       history.push({role:'assistant', content: acc});
+      bubble.parentElement.dataset.i = history.length - 1;
       debouncedSave();
     }).catch(e=>{
       renderMd(bubble, '⚠️ 网络错误，请重试');
@@ -1071,23 +1180,6 @@ function renderShareImage(userText, aiMd){
   const shareModal = document.getElementById('shareModal');
   $('#shareClose').addEventListener('click', ()=>{ shareModal.classList.remove('show'); });
   shareModal.addEventListener('click', (e)=>{ if(e.target === shareModal) shareModal.classList.remove('show'); });
-  function isWeChat(){ return /MicroMessenger/i.test(navigator.userAgent); }
-  $('#shareDl').addEventListener('click', ()=>{
-    if(isWeChat()){
-      // 微信内置浏览器屏蔽 a[download]，改为引导长按保存
-      const tip = document.querySelector('.share-tip');
-      tip.textContent = '请长按上方图片 → 弹出菜单点「保存图片」';
-      tip.style.color = '#3ee6ff';
-      return;
-    }
-    const img = document.getElementById('shareImg');
-    const a = document.createElement('a');
-    a.href = img.src;
-    a.download = '思维教练分享图.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  });
 
   // 记住本次会话输入的口令（仅内存，用于后续请求）
   passcode.addEventListener('input', ()=>{ localStorage.setItem('tc_pass', passcode.value.trim()); });
