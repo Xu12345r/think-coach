@@ -531,6 +531,27 @@ function splitBold(text){
   return segs.length ? segs : [{t:text, bold:false}];
 }
 
+// 足球烯 logo 图片（供长图 canvas 使用，从页面 symbol 转出）
+let FOOTBALLENE_IMG = null;
+let FOOTBALLENE_PROMISE = null;
+function ensureFootballene(){
+  if(FOOTBALLENE_IMG && FOOTBALLENE_IMG.complete && FOOTBALLENE_IMG.naturalWidth > 0){
+    return Promise.resolve(FOOTBALLENE_IMG);
+  }
+  if(FOOTBALLENE_PROMISE) return FOOTBALLENE_PROMISE;
+  FOOTBALLENE_PROMISE = new Promise((resolve, reject) => {
+    const sym = document.getElementById('footballene');
+    if(!sym){ FOOTBALLENE_PROMISE = null; reject(new Error('no footballene symbol')); return; }
+    const svgStr = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">' + sym.innerHTML + '</svg>';
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+    const img = new Image();
+    img.onload = function(){ FOOTBALLENE_IMG = img; resolve(img); };
+    img.onerror = function(){ FOOTBALLENE_PROMISE = null; reject(new Error('footballene load fail')); };
+    img.src = dataUrl;
+  });
+  return FOOTBALLENE_PROMISE;
+}
+
 function renderShareImage(userText, aiMd, nick){
   const W = 750, PAD = 46;
   const blocks = mdToBlocks(aiMd);
@@ -634,25 +655,29 @@ function renderShareImage(userText, aiMd, nick){
 
   let y = PAD;
 
-  // logo + 标题
+  // logo（足球烯，从页面 symbol 转图片绘制）
   const logoR = 30;
-  const lg = ctx.createLinearGradient(PAD, y, PAD+logoR*2, y+logoR*2);
-  lg.addColorStop(0, COL_BUBBLE1);
-  lg.addColorStop(1, COL_BUBBLE2);
-  ctx.fillStyle = lg;
-  roundRect(ctx, PAD, y, logoR*2, logoR*2, 14);
-  ctx.fill();
-  // logo 里的太阳图标
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(PAD+logoR, y+logoR, 9, 0, Math.PI*2);
-  ctx.stroke();
-  for(let i=0;i<8;i++){
-    const a = i*Math.PI/4;
-    const x1 = PAD+logoR + Math.cos(a)*14, y1 = y+logoR + Math.sin(a)*14;
-    const x2 = PAD+logoR + Math.cos(a)*20, y2 = y+logoR + Math.sin(a)*20;
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  if(FOOTBALLENE_IMG && FOOTBALLENE_IMG.complete && FOOTBALLENE_IMG.naturalWidth > 0){
+    ctx.drawImage(FOOTBALLENE_IMG, PAD, y, logoR*2, logoR*2);
+  } else {
+    // 回退：渐变圆 + 太阳图标
+    const lg = ctx.createLinearGradient(PAD, y, PAD+logoR*2, y+logoR*2);
+    lg.addColorStop(0, COL_BUBBLE1);
+    lg.addColorStop(1, COL_BUBBLE2);
+    ctx.fillStyle = lg;
+    roundRect(ctx, PAD, y, logoR*2, logoR*2, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(PAD+logoR, y+logoR, 9, 0, Math.PI*2);
+    ctx.stroke();
+    for(let i=0;i<8;i++){
+      const a = i*Math.PI/4;
+      const x1 = PAD+logoR + Math.cos(a)*14, y1 = y+logoR + Math.sin(a)*14;
+      const x2 = PAD+logoR + Math.cos(a)*20, y2 = y+logoR + Math.sin(a)*20;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
   }
   // 标题文字
   ctx.fillStyle = '#fff';
@@ -987,8 +1012,9 @@ function renderShareImage(userText, aiMd, nick){
   }
 
   // ===== 分享长图 =====
-  function showShare(userText, aiMd){
+  async function showShare(userText, aiMd){
     try {
+      await ensureFootballene();
       const canvas = renderShareImage(userText, aiMd, nickname);
       const img = document.getElementById('shareImg');
       // 用 data URL（完整 base64）而非 blob URL：微信长按保存 blob URL 会截断成半截
