@@ -531,7 +531,7 @@ function splitBold(text){
   return segs.length ? segs : [{t:text, bold:false}];
 }
 
-function renderShareImage(userText, aiMd){
+function renderShareImage(userText, aiMd, nick){
   const W = 750, PAD = 46;
   const blocks = mdToBlocks(aiMd);
 
@@ -603,14 +603,14 @@ function renderShareImage(userText, aiMd){
 
   // 卡片高度 = 内边距 + 内容
   const aiCardH = aiH + 40;
-  const aiSectionH = aiCardH + 46; // 含"思维教练的分析"标签
+  const aiSectionH = aiCardH + 46; // 含"AI万sir的回答"标签
 
   // 总高度
   const H = PAD            // 顶部留白
     + 60 + 40              // logo 区
     + 22 + 12              // 标题区（标题+副标题）
     + 24                   // 分隔线
-    + 30 + 22              // "你的问题"标签
+    + 30 + 22              // "问题"标签
     + userBoxH             // 用户气泡
     + 20                   // 间距
     + aiSectionH           // AI 分析区
@@ -660,7 +660,7 @@ function renderShareImage(userText, aiMd){
   ctx.fillText('思维教练', PAD + logoR*2 + 22, y + 44);
   ctx.fillStyle = COL_DIM;
   ctx.font = F_SUB;
-  ctx.fillText('现代思维工具100讲 · 万维钢', PAD + logoR*2 + 22, y + 78);
+  ctx.fillText('AI万sir', PAD + logoR*2 + 22, y + 78);
   y += logoR*2 + 26;
 
   // 分隔线
@@ -672,10 +672,10 @@ function renderShareImage(userText, aiMd){
   ctx.stroke();
   y += 34;
 
-  // "你的问题"标签
+  // 问题标签
   ctx.fillStyle = COL_ACC;
   ctx.font = F_TAG;
-  ctx.fillText('你的问题', PAD, y);
+  ctx.fillText((nick || '我') + '的问题', PAD, y);
   y += 30;
 
   // 用户气泡（右对齐）
@@ -697,10 +697,10 @@ function renderShareImage(userText, aiMd){
   }
   y = bubbleY + userBoxH + 26;
 
-  // "思维教练的分析"标签
+  // "AI万sir的回答"标签
   ctx.fillStyle = COL_ACC;
   ctx.font = F_TAG;
-  ctx.fillText('思维教练的分析', PAD, y);
+  ctx.fillText('AI万sir的回答', PAD, y);
   y += 30;
 
   // AI 卡片
@@ -989,7 +989,7 @@ function renderShareImage(userText, aiMd){
   // ===== 分享长图 =====
   function showShare(userText, aiMd){
     try {
-      const canvas = renderShareImage(userText, aiMd);
+      const canvas = renderShareImage(userText, aiMd, nickname);
       const img = document.getElementById('shareImg');
       // 用 data URL（完整 base64）而非 blob URL：微信长按保存 blob URL 会截断成半截
       img.src = canvas.toDataURL('image/png');
