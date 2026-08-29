@@ -765,7 +765,6 @@ function renderShareImage(userText, aiMd){
   let sessions = [];  // 所有会话 [{id, title, created, messages}]
   let activeId = null;
   let nickname = localStorage.getItem('tc_nickname') || '';
-  let unlocked = localStorage.getItem('tc_unlocked') === '1';
   let busy = false;
   let syncing = false;
 
@@ -856,7 +855,6 @@ function renderShareImage(userText, aiMd){
       body: JSON.stringify({ passcode:code, question:'' })
     }).then(r=>{
       if(r.status === 400){ // 口令正确（仅问题为空）
-        localStorage.setItem('tc_unlocked','1');
         localStorage.setItem('tc_pass', code);
         if(nickname){ enterApp(); }
         else { showNickInput(); }
@@ -889,10 +887,6 @@ function renderShareImage(userText, aiMd){
     gate.classList.remove('hide');
     showNickInput();
   });
-  if(unlocked){
-    if(nickname){ enterApp(); }
-    else { showNickInput(); }
-  }
 
   // ===== 消息渲染 =====
   function scrollBottom(){ chat.scrollTop = chat.scrollHeight; }
