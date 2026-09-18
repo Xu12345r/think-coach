@@ -900,6 +900,21 @@ function renderShareImage(userText, aiMd, nick){
     let loaded = [];
     try { loaded = await loadCloudHistory(nickname); } catch(e){ loaded = []; }
     sessions = loaded;
+    const urlQ = new URLSearchParams(location.search).get('q');
+    if(urlQ && !autoAsked){
+      autoAsked = true;
+      const s = newSession();
+      sessions.unshift(s);
+      setActive(s.id);
+      headNick.textContent = nickname || '';
+      gate.classList.add('hide');
+      chat.innerHTML = '';
+      addAiMsg(WELCOME, false);
+      const q = '我正在学习「' + urlQ + '」这个知识点，帮我梳理一下核心内容';
+      input.value = q;
+      doSend();
+      return;
+    }
     if(!sessions.length){ sessions.push(newSession()); }
     const saved = localStorage.getItem('tc_active');
     setActive((saved && sessions.find(s => s.id === saved)) ? saved : sessions[0].id);
@@ -908,13 +923,6 @@ function renderShareImage(userText, aiMd, nick){
     chat.innerHTML = '';
     if(history.length){ restoreHistory(); }
     else { addAiMsg(WELCOME, false); }
-    const urlQ = new URLSearchParams(location.search).get('q');
-    if(urlQ && !autoAsked){
-      autoAsked = true;
-      const q = '我正在学习「' + urlQ + '」这个知识点，帮我梳理一下核心内容';
-      input.value = q;
-      doSend();
-    }
   }
   function showNickInput(){
     passWrap.style.display = 'none';
