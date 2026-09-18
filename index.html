@@ -827,6 +827,7 @@ function renderShareImage(userText, aiMd, nick){
   let sessions = [];  // 所有会话 [{id, title, created, messages}]
   let activeId = null;
   let nickname = localStorage.getItem('tc_nickname') || '';
+  let autoAsked = false;
   let busy = false;
   let syncing = false;
 
@@ -907,6 +908,13 @@ function renderShareImage(userText, aiMd, nick){
     chat.innerHTML = '';
     if(history.length){ restoreHistory(); }
     else { addAiMsg(WELCOME, false); }
+    const urlQ = new URLSearchParams(location.search).get('q');
+    if(urlQ && !autoAsked){
+      autoAsked = true;
+      const q = '我正在学习「' + urlQ + '」这个知识点，帮我梳理一下核心内容';
+      input.value = q;
+      doSend();
+    }
   }
   function showNickInput(){
     passWrap.style.display = 'none';
